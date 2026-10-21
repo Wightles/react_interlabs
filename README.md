@@ -35,9 +35,9 @@ npm start        # QR-код для Expo Go на телефоне
 
 В проекте уже есть компоненты, которые написал коллега:
 
-- `src/components/FavoriteButton.tsx` — звёздочка «в избранное»;
-- `src/hooks/useFavorites.ts` — хук со списком избранных матчей;
-- `src/components/UpdatedAgo.tsx` — подпись «Обновлено N сек назад».
+- `src/components/FavoriteButton.tsx` – звёздочка «в избранное»;
+- `src/hooks/useFavorites.ts` – хук со списком избранных матчей;
+- `src/components/UpdatedAgo.tsx` – подпись «Обновлено N сек назад».
 
 Подключите звёздочку к каждой карточке матча. От тестировщика пришли жалобы:
 
