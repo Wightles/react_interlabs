@@ -35,7 +35,7 @@ const filters: { id: MatchFilter; label: string }[] = [
 
 const statusLabels: Record<string, string> = {
   scheduled: 'Запланирован',
-  live: 'Идёт' ,
+  live: 'Идёт',
   finished: 'Завершён',
   postponed: 'Перенесён',
 };
@@ -65,7 +65,7 @@ function MatchCard({ match, favorite, onToggleFavorite }: {
       <View style={styles.cardTop}>
         <Text style={[styles.status, isLive && styles.liveStatus]}>
           {isLive && <Text style={styles.liveDot}>● </Text>}
-          {isLive && match.minute ? `${match.minute}′ · ` : ''}{status}
+          {isLive && match.minute != null ? `${match.minute}′ · ` : ''}{status}
         </Text>
         <FavoriteButton active={favorite} onPress={onToggleFavorite} />
       </View>
@@ -88,6 +88,7 @@ function MatchCard({ match, favorite, onToggleFavorite }: {
 
 export function MatchesScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [round, setRound] = useState<number | null>(null);
   const [filter, setFilter] = useState<MatchFilter>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,11 +104,12 @@ export function MatchesScreen() {
     try {
       const response = await fetch(MATCHES_URL);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload: { matches?: Match[] } = await response.json();
+      const payload: { round?: number; matches?: Match[] } = await response.json();
       if (!Array.isArray(payload.matches)) {
         throw new Error('В ответе нет списка матчей');
       }
       setMatches(payload.matches);
+      setRound(typeof payload.round === 'number' ? payload.round : null);
       setUpdatedAt(new Date());
     } catch {
       setError('Не удалось загрузить матчи. Проверьте соединение и попробуйте ещё раз.');
@@ -151,7 +153,9 @@ export function MatchesScreen() {
         }
         ListHeaderComponent={
           <View>
-            <Text style={styles.eyebrow}>ПРЕМЬЕР-ЛИГА · ТУР 12</Text>
+            <Text style={styles.eyebrow}>
+              ПРЕМЬЕР-ЛИГА{round == null ? '' : ` · ТУР ${round}`}
+            </Text>
             <View style={styles.headingRow}>
               <View>
                 <Text style={styles.title}>Матчи тура</Text>
