@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { FavoriteButton } from '../components/FavoriteButton';
@@ -90,6 +91,7 @@ export function MatchesScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [round, setRound] = useState<number | null>(null);
   const [filter, setFilter] = useState<MatchFilter>('all');
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +127,12 @@ export function MatchesScreen() {
 
   const visibleMatches = useMemo(() => {
     const filtered = matches.filter((match) => {
+      const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+      const homeName = match.home.name.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+      const awayName = match.away.name.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+      if (normalizedQuery && !homeName.includes(normalizedQuery) && !awayName.includes(normalizedQuery)) {
+        return false;
+      }
       if (filter === 'upcoming') return match.status === 'scheduled' || match.status === 'live';
       if (filter === 'finished') return match.status === 'finished';
       return true;
@@ -134,13 +142,15 @@ export function MatchesScreen() {
       const bTime = b.startsAt ? new Date(b.startsAt).getTime() : Number.POSITIVE_INFINITY;
       return aTime - bTime;
     });
-  }, [filter, matches]);
+  }, [filter, matches, query]);
 
-  const emptyLabel = filter === 'all'
-    ? 'В этом туре пока нет матчей.'
-    : filter === 'upcoming'
-      ? 'Предстоящих матчей нет.'
-      : 'Завершённых матчей пока нет.';
+  const emptyLabel = query.trim()
+    ? `По запросу «${query.trim()}» матчей не найдено.`
+    : filter === 'all'
+      ? 'В этом туре пока нет матчей.'
+      : filter === 'upcoming'
+        ? 'Предстоящих матчей нет.'
+        : 'Завершённых матчей пока нет.';
 
   return (
     <View style={styles.screen}>
@@ -171,6 +181,29 @@ export function MatchesScreen() {
               </Pressable>
             </View>
             {updatedAt ? <UpdatedAgo since={updatedAt} /> : null}
+
+            <View style={styles.searchBox}>
+              <Text style={styles.searchIcon}>⌕</Text>
+              <TextInput
+                accessibilityLabel="Поиск по командам"
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Найти команду"
+                placeholderTextColor="#929998"
+                returnKeyType="search"
+                style={styles.searchInput}
+              />
+              {query.length > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Очистить поиск"
+                  hitSlop={10}
+                  onPress={() => setQuery('')}
+                >
+                  <Text style={styles.clearSearch}>×</Text>
+                </Pressable>
+              ) : null}
+            </View>
 
             <View style={styles.filters}>
               {filters.map((item) => {
@@ -211,7 +244,7 @@ export function MatchesScreen() {
           loading || error ? null : (
             <View style={styles.messageBox}>
               <Text style={styles.messageTitle}>{emptyLabel}</Text>
-              {filter !== 'all' && matches.length > 0 ? (
+              {!query.trim() && filter !== 'all' && matches.length > 0 ? (
                 <Text style={styles.messageText}>Попробуйте выбрать другой фильтр.</Text>
               ) : null}
             </View>
@@ -247,6 +280,10 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.65 },
   refreshIcon: { color: '#a35c46', fontSize: 18, fontWeight: '600' },
   refreshText: { color: '#454d50', fontSize: 13, fontWeight: '600' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e9e5df', borderRadius: 11, paddingHorizontal: 13, marginTop: 20 },
+  searchIcon: { color: '#858d8d', fontSize: 22, lineHeight: 25 },
+  searchInput: { flex: 1, color: '#293238', fontSize: 14, paddingVertical: 12 },
+  clearSearch: { color: '#858d8d', fontSize: 22, paddingHorizontal: 2 },
   filters: { flexDirection: 'row', gap: 8, marginTop: 24, marginBottom: 14 },
   filter: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#eeece7' },
   selectedFilter: { backgroundColor: '#29363b' },
