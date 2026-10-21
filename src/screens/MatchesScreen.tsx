@@ -188,18 +188,27 @@ export function MatchesScreen() {
                 );
               })}
             </View>
+            {error ? (
+              <View style={styles.errorBanner}>
+                <View style={styles.errorCopy}>
+                  <Text style={styles.errorTitle}>
+                    {matches.length > 0 ? 'Не удалось обновить матчи' : 'Не удалось загрузить матчи'}
+                  </Text>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void loadMatches(matches.length > 0)}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryText}>Повторить</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          loading ? null : error ? (
-            <View style={styles.messageBox}>
-              <Text style={styles.messageTitle}>Не получилось загрузить</Text>
-              <Text style={styles.messageText}>{error}</Text>
-              <Pressable onPress={() => void loadMatches()} style={styles.retryButton}>
-                <Text style={styles.retryText}>Повторить</Text>
-              </Pressable>
-            </View>
-          ) : (
+          loading || error ? null : (
             <View style={styles.messageBox}>
               <Text style={styles.messageTitle}>{emptyLabel}</Text>
               {filter !== 'all' && matches.length > 0 ? (
@@ -257,6 +266,10 @@ const styles = StyleSheet.create({
   messageBox: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 44, backgroundColor: '#fff', borderRadius: 14, marginTop: 4 },
   messageTitle: { color: '#323b3f', fontSize: 16, fontWeight: '700', textAlign: 'center' },
   messageText: { color: '#7b8385', fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 7 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: 14, backgroundColor: '#fff0ed', borderColor: '#f2d3cb', borderWidth: 1, borderRadius: 12, marginBottom: 14 },
+  errorCopy: { flex: 1 },
+  errorTitle: { color: '#843d31', fontSize: 13, fontWeight: '700' },
+  errorText: { color: '#8b625a', fontSize: 12, lineHeight: 17, marginTop: 4 },
   retryButton: { backgroundColor: '#29363b', borderRadius: 9, paddingHorizontal: 18, paddingVertical: 10, marginTop: 16 },
   retryText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   loader: { paddingVertical: 20 },
