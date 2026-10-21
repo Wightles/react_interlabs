@@ -22,9 +22,9 @@ export function FavoriteButton({ active, onPress }: Props) {
 const styles = StyleSheet.create({
   star: {
     fontSize: 22,
-    color: '#9ca3af',
+    color: '#74818a',
   },
   active: {
-    color: '#ef3124',
+    color: '#a6dc45',
   },
 });

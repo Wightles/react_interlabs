@@ -24,6 +24,6 @@ export function UpdatedAgo({ since }: Props) {
 const styles = StyleSheet.create({
   text: {
     fontSize: 13,
-    color: '#6b7280',
+    color: '#92a0a7',
   },
 });

@@ -14,12 +14,10 @@ import { UpdatedAgo } from '../components/UpdatedAgo';
 import { MATCHES_URL } from '../config';
 import { useFavorites } from '../hooks/useFavorites';
 
-type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | string;
-
 type Match = {
   id: string;
   startsAt: string | null;
-  status: MatchStatus;
+  status: string;
   minute?: number;
   home: { id: string; name: string; city: string };
   away: { id: string; name: string; city: string };
@@ -35,54 +33,70 @@ const filters: { id: MatchFilter; label: string }[] = [
 ];
 
 const statusLabels: Record<string, string> = {
-  scheduled: 'Запланирован',
-  live: 'Идёт',
-  finished: 'Завершён',
-  postponed: 'Перенесён',
+  scheduled: 'ЗАПЛАНИРОВАН',
+  live: 'ИДЁТ',
+  finished: 'ЗАВЕРШЁН',
+  postponed: 'ПЕРЕНЕСЁН',
 };
 
-function formatKickoff(value: string | null) {
+function normalize(value: string) {
+  return value.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+}
+
+function formatMatchDate(value: string | null) {
   if (!value) return 'Дата уточняется';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Дата уточняется';
   return new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
+  }).format(date);
+}
+
+function formatKickoff(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
 }
 
-function MatchCard({ match, favorite, onToggleFavorite }: {
+function MatchRow({ match, favorite, onToggleFavorite }: {
   match: Match;
   favorite: boolean;
   onToggleFavorite: () => void;
 }) {
-  const status = statusLabels[match.status] ?? 'Статус неизвестен';
   const isLive = match.status === 'live';
+  const status = statusLabels[match.status] ?? 'СТАТУС НЕИЗВЕСТЕН';
+  const score = match.score ? `${match.score.home} : ${match.score.away}` : '– : –';
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={[styles.status, isLive && styles.liveStatus]}>
-          {isLive && <Text style={styles.liveDot}>● </Text>}
-          {isLive && match.minute != null ? `${match.minute}′ · ` : ''}{status}
-        </Text>
-        <FavoriteButton active={favorite} onPress={onToggleFavorite} />
+    <View style={styles.matchRow}>
+      <View style={styles.matchMeta}>
+        <View style={styles.statusLine}>
+          {isLive ? <View style={styles.liveDot} /> : null}
+          <Text style={[styles.status, isLive && styles.liveStatus]}>
+            {isLive && match.minute != null ? `${status} · ${match.minute}′` : status}
+          </Text>
+        </View>
+        <View style={styles.rowActions}>
+          {formatKickoff(match.startsAt) ? (
+            <Text style={styles.kickoff}>{formatKickoff(match.startsAt)}</Text>
+          ) : null}
+          <FavoriteButton active={favorite} onPress={onToggleFavorite} />
+        </View>
       </View>
 
-      <View style={styles.teams}>
+      <View style={styles.matchContent}>
         <View style={styles.teamNames}>
           <Text numberOfLines={1} style={styles.teamName}>{match.home.name}</Text>
           <Text numberOfLines={1} style={styles.teamName}>{match.away.name}</Text>
         </View>
-        <View style={styles.score}>
-          <Text style={styles.scoreValue}>{match.score ? match.score.home : '–'}</Text>
-          <Text style={styles.scoreValue}>{match.score ? match.score.away : '–'}</Text>
-        </View>
+        <Text style={[styles.score, !match.score && styles.noScore]}>{score}</Text>
       </View>
-
-      <Text style={styles.kickoff}>{formatKickoff(match.startsAt)}</Text>
     </View>
   );
 }
@@ -126,10 +140,10 @@ export function MatchesScreen() {
   }, [loadMatches]);
 
   const visibleMatches = useMemo(() => {
+    const normalizedQuery = normalize(query);
     const filtered = matches.filter((match) => {
-      const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
-      const homeName = match.home.name.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
-      const awayName = match.away.name.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+      const homeName = normalize(match.home.name);
+      const awayName = normalize(match.away.name);
       if (normalizedQuery && !homeName.includes(normalizedQuery) && !awayName.includes(normalizedQuery)) {
         return false;
       }
@@ -159,25 +173,35 @@ export function MatchesScreen() {
         keyExtractor={(match) => match.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void loadMatches(true)} tintColor="#d85b3f" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadMatches(true)}
+            tintColor="#a6dc45"
+            colors={['#a6dc45']}
+          />
         }
         ListHeaderComponent={
           <View>
-            <Text style={styles.eyebrow}>
-              ПРЕМЬЕР-ЛИГА{round == null ? '' : ` · ТУР ${round}`}
-            </Text>
+            <View style={styles.topline}>
+              <View style={styles.sportMark}><Text style={styles.sportMarkText}>＋</Text></View>
+              <Text style={styles.sportName}>ФУТБОЛ</Text>
+              <Text style={styles.matchCount}>Матчи · {matches.length}</Text>
+            </View>
+
             <View style={styles.headingRow}>
               <View>
                 <Text style={styles.title}>Матчи тура</Text>
-                <Text style={styles.subtitle}>Расписание и результаты</Text>
+                <Text style={styles.competition}>
+                  МИР РПЛ{round == null ? '' : ` · ${round} ТУР`}
+                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Обновить матчи"
                 onPress={() => void loadMatches(true)}
                 style={({ pressed }) => [styles.refreshButton, pressed && styles.pressed]}
               >
                 <Text style={styles.refreshIcon}>↻</Text>
-                <Text style={styles.refreshText}>Обновить</Text>
               </Pressable>
             </View>
             {updatedAt ? <UpdatedAgo since={updatedAt} /> : null}
@@ -188,8 +212,8 @@ export function MatchesScreen() {
                 accessibilityLabel="Поиск по командам"
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Найти команду"
-                placeholderTextColor="#929998"
+                placeholder="Команда или турнир"
+                placeholderTextColor="#87949b"
                 returnKeyType="search"
                 style={styles.searchInput}
               />
@@ -216,11 +240,14 @@ export function MatchesScreen() {
                     onPress={() => setFilter(item.id)}
                     style={[styles.filter, selected && styles.selectedFilter]}
                   >
-                    <Text style={[styles.filterText, selected && styles.selectedFilterText]}>{item.label}</Text>
+                    <Text style={[styles.filterText, selected && styles.selectedFilterText]}>
+                      {item.label}
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
+
             {error ? (
               <View style={styles.errorBanner}>
                 <View style={styles.errorCopy}>
@@ -250,18 +277,31 @@ export function MatchesScreen() {
             </View>
           )
         }
-        renderItem={({ item }) => (
-          <MatchCard
-            match={item}
-            favorite={isFavorite(item.id)}
-            onToggleFavorite={() => toggle(item.id)}
-          />
-        )}
-        ListFooterComponent={loading ? <ActivityIndicator style={styles.loader} color="#d85b3f" /> : null}
+        renderItem={({ item, index }) => {
+          const previousMatch = visibleMatches[index - 1];
+          const dateLabel = formatMatchDate(item.startsAt);
+          const startsNewDate = !previousMatch || formatMatchDate(previousMatch.startsAt) !== dateLabel;
+          return (
+            <View>
+              {startsNewDate ? (
+                <View style={styles.dateHeading}>
+                  <Text style={styles.dateHeadingText}>{dateLabel.toLocaleUpperCase('ru-RU')}</Text>
+                  <Text style={styles.scoreHeading}>СЧЁТ</Text>
+                </View>
+              ) : null}
+              <MatchRow
+                match={item}
+                favorite={isFavorite(item.id)}
+                onToggleFavorite={() => toggle(item.id)}
+              />
+            </View>
+          );
+        }}
+        ListFooterComponent={loading ? <ActivityIndicator style={styles.loader} color="#a6dc45" /> : null}
       />
       {loading && matches.length === 0 ? (
         <View style={styles.initialLoader}>
-          <ActivityIndicator color="#d85b3f" />
+          <ActivityIndicator color="#a6dc45" />
           <Text style={styles.loadingText}>Загружаем матчи…</Text>
         </View>
       ) : null}
@@ -270,46 +310,113 @@ export function MatchesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f7f5f1' },
-  listContent: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-  eyebrow: { color: '#a35c46', fontSize: 11, fontWeight: '700', letterSpacing: 1.4, marginBottom: 10 },
-  headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  title: { color: '#252d32', fontSize: 32, fontWeight: '800', letterSpacing: -0.7 },
-  subtitle: { color: '#737b7e', fontSize: 14, marginTop: 4 },
-  refreshButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e9e5df', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  screen: { flex: 1, backgroundColor: '#0f151b' },
+  listContent: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    boxSizing: 'border-box',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 40,
+  },
+  topline: { flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
+  sportMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#a6dc45',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 9,
+  },
+  sportMarkText: { color: '#172016', fontSize: 18, lineHeight: 20, fontWeight: '700' },
+  sportName: { color: '#e8edef', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  matchCount: { color: '#91a0a7', fontSize: 12, marginLeft: 'auto' },
+  headingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  title: { color: '#f2f4f5', fontSize: 27, fontWeight: '800', letterSpacing: -0.4 },
+  competition: { color: '#a6dc45', fontSize: 11, fontWeight: '700', letterSpacing: 0.7, marginTop: 5 },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#1c2730',
+  },
   pressed: { opacity: 0.65 },
-  refreshIcon: { color: '#a35c46', fontSize: 18, fontWeight: '600' },
-  refreshText: { color: '#454d50', fontSize: 13, fontWeight: '600' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e9e5df', borderRadius: 11, paddingHorizontal: 13, marginTop: 20 },
-  searchIcon: { color: '#858d8d', fontSize: 22, lineHeight: 25 },
-  searchInput: { flex: 1, color: '#293238', fontSize: 14, paddingVertical: 12 },
-  clearSearch: { color: '#858d8d', fontSize: 22, paddingHorizontal: 2 },
-  filters: { flexDirection: 'row', gap: 8, marginTop: 24, marginBottom: 14 },
-  filter: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#eeece7' },
-  selectedFilter: { backgroundColor: '#29363b' },
-  filterText: { color: '#626a6c', fontSize: 13, fontWeight: '600' },
-  selectedFilterText: { color: '#fff' },
-  card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#eeece7', padding: 16, marginBottom: 10, shadowColor: '#253136', shadowOpacity: 0.035, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 26 },
-  status: { color: '#7a8283', fontSize: 12, fontWeight: '600' },
-  liveStatus: { color: '#b33c2e' },
-  liveDot: { color: '#d85b3f', fontSize: 9 },
-  teams: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  teamNames: { flex: 1, gap: 8, paddingRight: 12 },
-  teamName: { color: '#293238', fontSize: 16, fontWeight: '700' },
-  score: { minWidth: 48, alignItems: 'flex-end', gap: 6 },
-  scoreValue: { color: '#293238', fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  kickoff: { color: '#7b8385', fontSize: 12, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0efec' },
-  messageBox: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 44, backgroundColor: '#fff', borderRadius: 14, marginTop: 4 },
-  messageTitle: { color: '#323b3f', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  messageText: { color: '#7b8385', fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 7 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: 14, backgroundColor: '#fff0ed', borderColor: '#f2d3cb', borderWidth: 1, borderRadius: 12, marginBottom: 14 },
+  refreshIcon: { color: '#d8e0e3', fontSize: 24, lineHeight: 28 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1c2730',
+    borderRadius: 8,
+    paddingHorizontal: 13,
+    marginTop: 15,
+  },
+  searchIcon: { color: '#9aa6ac', fontSize: 22, lineHeight: 25 },
+  searchInput: { flex: 1, minWidth: 0, color: '#edf1f2', fontSize: 14, paddingVertical: 12 },
+  clearSearch: { color: '#aab5bb', fontSize: 22, paddingHorizontal: 2 },
+  filters: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 3,
+    marginTop: 12,
+    marginBottom: 18,
+    backgroundColor: '#19232b',
+    borderRadius: 8,
+    padding: 3,
+  },
+  filter: { flex: 1, flexBasis: 0, minWidth: 0, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 6 },
+  selectedFilter: { backgroundColor: '#a6dc45' },
+  filterText: { color: '#aab5bb', fontSize: 12, fontWeight: '600' },
+  selectedFilterText: { color: '#172016', fontWeight: '800' },
+  dateHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingTop: 17,
+    paddingBottom: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#29353d',
+  },
+  dateHeadingText: { color: '#9aa6ac', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  scoreHeading: { color: '#84929a', fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
+  matchRow: {
+    paddingHorizontal: 4,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26323a',
+  },
+  matchMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 },
+  statusLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#a6dc45' },
+  status: { color: '#91a0a7', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  liveStatus: { color: '#a6dc45' },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  kickoff: { color: '#9aa6ac', fontSize: 11, fontVariant: ['tabular-nums'] },
+  matchContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  teamNames: { flex: 1, gap: 5, paddingRight: 12 },
+  teamName: { color: '#edf1f2', fontSize: 14, fontWeight: '600' },
+  score: { minWidth: 62, textAlign: 'center', color: '#f1f3f4', fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  noScore: { color: '#819098' },
+  messageBox: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 40, backgroundColor: '#19232b', borderRadius: 10 },
+  messageTitle: { color: '#edf1f2', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  messageText: { color: '#9aa6ac', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 7 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: 13, backgroundColor: '#302322', borderColor: '#543a37', borderWidth: 1, borderRadius: 8, marginBottom: 14 },
   errorCopy: { flex: 1 },
-  errorTitle: { color: '#843d31', fontSize: 13, fontWeight: '700' },
-  errorText: { color: '#8b625a', fontSize: 12, lineHeight: 17, marginTop: 4 },
-  retryButton: { backgroundColor: '#29363b', borderRadius: 9, paddingHorizontal: 18, paddingVertical: 10, marginTop: 16 },
-  retryText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  errorTitle: { color: '#f2c0b6', fontSize: 12, fontWeight: '700' },
+  errorText: { color: '#c9a39c', fontSize: 11, lineHeight: 16, marginTop: 4 },
+  retryButton: { backgroundColor: '#a6dc45', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 9 },
+  retryText: { color: '#172016', fontSize: 11, fontWeight: '800' },
   loader: { paddingVertical: 20 },
   initialLoader: { position: 'absolute', top: 220, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  loadingText: { color: '#7b8385', fontSize: 13 },
+  loadingText: { color: '#aab5bb', fontSize: 13 },
 });
